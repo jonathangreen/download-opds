@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "dowload-feed"
+version = "0.1.0"
+description = "Download multipage OPDS2 feed into a single file."
+authors = ["Your Name <you@example.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = ">=3.9,<3.13"
+requests = "^2.31.0"
+alive-progress = "^3.1.4"
+pyinstaller = "^5.13.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
