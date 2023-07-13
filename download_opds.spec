@@ -47,5 +47,5 @@ exe = EXE(
     argv_emulation=False,
     target_arch=None,
     codesign_identity='Q8F564R76U',
-    entitlements_file=None,
+    entitlements_file='entitlements.plist',
 )
