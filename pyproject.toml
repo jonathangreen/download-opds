@@ -39,6 +39,8 @@ requests = "^2.31.0"
 [tool.poetry.group.dev.dependencies]
 mypy = "^1.4.1"
 pre-commit = "^3.2"
+pandas-stubs = "^2.0.2.230605"
+types-requests = "^2.31.0.2"
 
 [tool.tomlsort]
 ignore_case = true
