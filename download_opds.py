@@ -4,18 +4,23 @@ import argparse
 import json
 import math
 import sys
+from collections.abc import MutableMapping
+from io import TextIOWrapper
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, List, Optional, Tuple
 
+import pandas as pd
 import requests
 from alive_progress import alive_bar
 from requests import Session
 
 
 def flatten_dict(
-    dictionary: Dict[str, Any], parent_key: Otional[str] = None, separator: str = "."
-) -> Dict[str, str]:
-    items = []
+    dictionary: MutableMapping[str, Any],
+    parent_key: Optional[str] = None,
+    separator: str = ".",
+) -> Dict[str, Optional[str]]:
+    items: List[Tuple[str, Optional[str]]] = []
     for key, value in dictionary.items():
         new_key = str(parent_key) + separator + key if parent_key else key
         if isinstance(value, MutableMapping):
@@ -34,7 +39,7 @@ def flatten_dict(
     return dict(items)
 
 
-def flatten_list(data: List[Dict[str, Any]]) -> List[Dict[str, str]]:
+def flatten_list(data: List[Dict[str, Any]]) -> List[Dict[str, Optional[str]]]:
     return [flatten_dict(d) for d in data]
 
 
@@ -44,14 +49,14 @@ def make_request(session: Session, url: str) -> Dict[str, Any]:
         print(f"Error: {response.status_code}")
         print(response.text)
         sys.exit(-1)
-    return response.json()
+    return response.json()  # type: ignore[no-any-return]
 
 
-def write_json(file: File, data: List[Dict[str, Any]]) -> None:
+def write_json(file: TextIOWrapper, data: List[Dict[str, Any]]) -> None:
     file.write(json.dumps(data, indent=4))
 
 
-def write_csv(file: File, data: List[Dict[str, Any]]) -> None:
+def write_csv(file: TextIOWrapper, data: List[Dict[str, Any]]) -> None:
     flattened = flatten_list(data)
     df = pd.json_normalize(flattened)
     df.to_csv(file, index=False, encoding="utf-8")
