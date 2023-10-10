@@ -47,6 +47,7 @@ def make_request(session: Session, url: str) -> Dict[str, Any]:
     response = session.get(url)
     if response.status_code != 200:
         print(f"Error: {response.status_code}")
+        print(f"Headers: {json.dumps(dict(response.headers), indent=4)}")
         print(response.text)
         sys.exit(-1)
     return response.json()  # type: ignore[no-any-return]
@@ -82,7 +83,7 @@ if __name__ == "__main__":
     if args.username and args.password:
         session.auth = (args.username, args.password)
 
-    session.headers.update({"Accept": "application/opds+json"})
+    session.headers.update({"Accept": "application/opds+json", "User-Agent": "Palace"})
 
     publications = []
 
