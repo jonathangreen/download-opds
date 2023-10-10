@@ -596,6 +596,17 @@ files = [
 ]
 
 [[package]]
+name = "types-xmltodict"
+version = "0.13.0.3"
+description = "Typing stubs for xmltodict"
+optional = false
+python-versions = "*"
+files = [
+    {file = "types-xmltodict-0.13.0.3.tar.gz", hash = "sha256:8884534bab0364c4b22d5973f3c8153ff40d413a801d9e70eb893e676909f1fc"},
+    {file = "types_xmltodict-0.13.0.3-py3-none-any.whl", hash = "sha256:cb251c59e838986d8402b10d804225ade9fd6c9f66d01dc45cd6cfdf43640128"},
+]
+
+[[package]]
 name = "typing-extensions"
 version = "4.7.1"
 description = "Backported and Experimental Type Hints for Python 3.7+"
@@ -668,4 +679,4 @@ files = [
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.9,<3.13"
-content-hash = "5a915a320acd48c1a6ffd871240d834e4866c1f9147b477f564b2fc716e42979"
+content-hash = "6b649b7d6934bffdb3acbba6a073946734667409f09af939913ad9270a7629b7"

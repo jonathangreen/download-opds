@@ -48,6 +48,7 @@ mypy = "^1.4.1"
 pandas-stubs = "^2.0.2.230605"
 pre-commit = "^3.2"
 types-requests = "^2.31.0.2"
+types-xmltodict = "^0.13.0.3"
 
 [tool.tomlsort]
 ignore_case = true

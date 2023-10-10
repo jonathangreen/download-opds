@@ -14,12 +14,12 @@ availability_endpoint = "availability/v2"
 
 
 def get_headers(username: str, password: str, library_id: str) -> Dict[str, str]:
-    authorization = ":".join([username, password, library_id])
-    authorization = authorization.encode("utf_16_le")
-    authorization = base64.standard_b64encode(authorization)
+    authorization_str = ":".join([username, password, library_id])
+    authorization_bytes = authorization_str.encode("utf_16_le")
+    authorization_b64 = base64.standard_b64encode(authorization_bytes)
     resp = requests.post(
         PRODUCTION_BASE_URL + access_token_endpoint,
-        headers={"Authorization": b"Basic " + authorization},
+        headers={"Authorization": b"Basic " + authorization_b64},
     )
     return {
         "Authorization": "Bearer " + resp.json()["access_token"],
