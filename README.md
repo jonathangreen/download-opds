@@ -22,7 +22,7 @@ Once you have the requirements, you can install the dependencies with:
 poetry install
 ```
 
-## Usage
+## Usage (download_opds.py)
 
 ```bash
 usage: download_opds [-h] [-u USERNAME] [-p PASSWORD] [-c] url output_file
@@ -40,4 +40,25 @@ optional arguments:
   -p PASSWORD, --password PASSWORD
                         Password
   -c, --csv             Output CSV file
+```
+
+## Usage (download_axis.py)
+
+```bash
+usage: download_axis [-h] -u USERNAME -p PASSWORD -l LIBRARY_ID [-j] output_file
+
+Download B&T Axis 360 feed
+
+positional arguments:
+  output_file           Output file
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -u USERNAME, --username USERNAME
+                        Username
+  -p PASSWORD, --password PASSWORD
+                        Password
+  -l LIBRARY_ID, --library-id LIBRARY_ID
+                        Library ID
+  -j, --json            Output JSON file
 ```
