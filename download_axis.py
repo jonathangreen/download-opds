@@ -1,6 +1,7 @@
 import argparse
 import base64
 import json
+import sys
 from typing import Dict
 from xml.dom import minidom
 
@@ -21,6 +22,11 @@ def get_headers(username: str, password: str, library_id: str) -> Dict[str, str]
         PRODUCTION_BASE_URL + access_token_endpoint,
         headers={"Authorization": b"Basic " + authorization_b64},
     )
+    if resp.status_code != 200:
+        print(f"Error: {resp.status_code}")
+        print(f"Headers: {json.dumps(dict(resp.headers), indent=4)}")
+        print(resp.text)
+        sys.exit(-1)
     return {
         "Authorization": "Bearer " + resp.json()["access_token"],
         "Library": library_id,
@@ -55,9 +61,9 @@ if __name__ == "__main__":
     xml = availability(args.username, args.password, args.library_id)
 
     if args.json:
-        dict = xmltodict.parse(xml)
+        xml_dict = xmltodict.parse(xml)
         with open(args.output_file, "w") as file:
-            file.write(json.dumps(dict, indent=4))
+            file.write(json.dumps(xml_dict, indent=4))
     else:
         parsed = minidom.parseString(xml)
         with open(args.output_file, "w") as file:
