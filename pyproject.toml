@@ -38,6 +38,7 @@ version = "0.1.0"
 
 [tool.poetry.dependencies]
 alive-progress = "^3.1.4"
+httpx = "^0.25.1"
 pandas = "^2.0.3"
 python = ">=3.9,<3.13"
 requests = "^2.31.0"
