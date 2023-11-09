@@ -103,7 +103,7 @@ async def main(args: argparse.Namespace, base_url: str) -> list[dict[str, Any]]:
         fetches = (
             pages
             + (items if args.metadata else 0)
-            + (items if args.availability else 0)
+            + (items * 2 if args.availability else 0)
         )
         with alive_bar(fetches, file=sys.stderr) as bar:
             event_requests = []
@@ -136,6 +136,13 @@ async def main(args: argparse.Namespace, base_url: str) -> list[dict[str, Any]]:
                                 )
                             )
                         )
+                        availability_requests.append(
+                            client.get(
+                                product["links"]["availabilityV2"]["href"].removeprefix(
+                                    base_url
+                                )
+                            )
+                        )
                     products[product["id"].lower()] = product
                 bar()
 
@@ -144,9 +151,20 @@ async def main(args: argparse.Namespace, base_url: str) -> list[dict[str, Any]]:
             ):
                 response = await req
                 handle_error(response)
-                type = "metadata" if "metadata" in str(response.url) else "availability"
                 data = response.json()
-                products[data["id"].lower()][type] = data
+                url = str(response.url).lower()
+                if "availability" in url:
+                    if "v2" in str(response.url):
+                        _type = "availabilityV2"
+                        _id = data["reserveId"].lower()
+                    else:
+                        _type = "availability"
+                        _id = data["id"].lower()
+                else:
+                    _type = "metadata"
+                    _id = data["id"].lower()
+
+                products[_id][_type] = data
                 bar()
 
     return list(products.values())
