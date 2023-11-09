@@ -32,7 +32,7 @@ module = [
 [tool.poetry]
 authors = ["Your Name <you@example.com>"]
 description = "Download multipage OPDS2 feed into a single file."
-name = "dowload-feed"
+name = "dowload_feed_stub"
 readme = "README.md"
 version = "0.1.0"
 
