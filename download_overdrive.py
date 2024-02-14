@@ -2,17 +2,16 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import itertools
 import json
 import math
 import sys
-from asyncio import as_completed
+from collections import defaultdict, deque
 from pathlib import Path
 from typing import Any
 
 import httpx
 from alive_progress import alive_bar
-from httpx import URL, Limits, Response, Timeout
+from httpx import URL, HTTPStatusError, Limits, RequestError, Response, Timeout
 
 QA_BASE_URL = "https://integration.api.overdrive.com"
 PROD_BASE_URL = "https://api.overdrive.com"
@@ -28,6 +27,7 @@ ADVANTAGE_LIBRARY_ENDPOINT = (
 def handle_error(resp: Response) -> None:
     if resp.status_code == 200:
         return
+    print(f"URL: {resp.url}")
     print(f"Error: {resp.status_code}")
     print(f"Headers: {json.dumps(dict(resp.headers), indent=4)}")
     print(resp.text)
@@ -78,10 +78,30 @@ def event_url(
     return url + "?" + "&".join(f"{k}={v}" for k, v in params.items())
 
 
+def make_request(
+    client: httpx.AsyncClient,
+    urls: deque[str] | str,
+    pending_requests: list[asyncio.Task[Response]],
+) -> None:
+    if isinstance(urls, str):
+        url = urls
+    else:
+        url = urls.pop()
+    req = client.get(url)
+    task = asyncio.create_task(req)
+    pending_requests.append(task)
+
+
 async def main(args: argparse.Namespace, base_url: str) -> list[dict[str, Any]]:
+    num_connections = args.connections
+
     async with httpx.AsyncClient(
         timeout=Timeout(20.0, pool=None),
-        limits=Limits(max_connections=50, max_keepalive_connections=50),
+        limits=Limits(
+            max_connections=num_connections,
+            max_keepalive_connections=num_connections,
+            keepalive_expiry=5,
+        ),
     ) as client:
         auth_token = await get_auth_token(client, args.client_key, args.client_secret)
 
@@ -106,68 +126,90 @@ async def main(args: argparse.Namespace, base_url: str) -> list[dict[str, Any]]:
             + (items * 2 if args.availability else 0)
         )
         with alive_bar(fetches, file=sys.stderr) as bar:
-            event_requests = []
-            metadata_requests = []
-            availability_requests = []
+            urls: deque[str] = deque()
+            pending_requests: list[asyncio.Task[Response]] = []
+            products: dict[str, Any] = {}
+            retried_requests: defaultdict[str, int] = defaultdict(int)
+
             for i in range(pages):
-                event_requests.append(
-                    client.get(event_url(collection_token, offset=i * items_per_page))
+                urls.append(event_url(collection_token, offset=i * items_per_page))
+
+            for i in range(min(num_connections * 2, len(urls))):
+                make_request(client, urls, pending_requests)
+
+            while pending_requests:
+                done, pending = await asyncio.wait(
+                    pending_requests, return_when=asyncio.FIRST_COMPLETED
                 )
 
-            products = {}
-            for req in as_completed(event_requests):
-                response = await req
-                handle_error(response)
-                response_products = response.json()["products"]
-                for product in response_products:
-                    if args.metadata:
-                        metadata_requests.append(
-                            client.get(
-                                product["links"]["metadata"]["href"].removeprefix(
-                                    base_url
-                                )
-                            )
-                        )
-                    if args.availability:
-                        availability_requests.append(
-                            client.get(
-                                product["links"]["availability"]["href"].removeprefix(
-                                    base_url
-                                )
-                            )
-                        )
-                        availability_requests.append(
-                            client.get(
-                                product["links"]["availabilityV2"]["href"].removeprefix(
-                                    base_url
-                                )
-                            )
-                        )
-                    products[product["id"].lower()] = product
-                bar()
+                pending_requests = list(pending)
+                events_path = EVENTS_ENDPOINT % {"collection_token": collection_token}
 
-            for req in as_completed(
-                itertools.chain(metadata_requests, availability_requests)
-            ):
-                response = await req
-                handle_error(response)
-                data = response.json()
-                url = str(response.url).lower()
-                if "availability" in url:
-                    if "v2" in str(response.url):
-                        _type = "availabilityV2"
-                        _id = data["reserveId"].lower()
-                    else:
-                        _type = "availability"
-                        _id = data["id"].lower()
-                else:
-                    _type = "metadata"
-                    _id = data["id"].lower()
+                for req in done:
+                    try:
+                        response = await req
+                        process_request(
+                            response,
+                            args.metadata,
+                            args.availability,
+                            base_url,
+                            events_path,
+                            products,
+                            urls,
+                        )
+                        bar()
+                    except (RequestError, HTTPStatusError) as e:
+                        print(f"Request error: {e}")
+                        print(f"URL: {e.request.url}")
+                        request_url = str(e.request.url)
+                        retried_requests[request_url] += 1
 
-                products[_id][_type] = data
-                bar()
+                        if retried_requests[request_url] > 3:
+                            print("Too many retries. Exiting.")
+                            sys.exit(-1)
+                        else:
+                            print(
+                                f"Retrying request (attempt {retried_requests[request_url]}/3)"
+                            )
+                            urls.appendleft(request_url)
+                    if urls:
+                        make_request(client, urls, pending_requests)
 
     return list(products.values())
+
+
+def process_request(
+    response: Response,
+    request_metadata: bool,
+    request_availability: bool,
+    base_url: str,
+    events_path: str,
+    products: dict[str, Any],
+    urls: deque[str],
+) -> None:
+    data = response.raise_for_status().json()
+    path = response.url.path
+    if path == events_path:
+        response_products = data["products"]
+        for product in response_products:
+            if request_metadata:
+                urls.append(product["links"]["metadata"]["href"].removeprefix(base_url))
+            if request_availability:
+                urls.append(
+                    product["links"]["availability"]["href"].removeprefix(base_url)
+                )
+                urls.append(
+                    product["links"]["availabilityV2"]["href"].removeprefix(base_url)
+                )
+            products[product["id"].lower()] = product
+    elif path.endswith("availability") and path.startswith("/v1/"):
+        products[data["id"].lower()]["availability"] = data
+    elif path.endswith("availability") and path.startswith("/v2/"):
+        products[data["reserveId"].lower()]["availabilityV2"] = data
+    elif path.endswith("metadata") and path.startswith("/v1/"):
+        products[data["id"].lower()]["metadata"] = data
+    else:
+        raise RuntimeError(f"Unknown URL: {response.url}")
 
 
 if __name__ == "__main__":
@@ -186,6 +228,9 @@ if __name__ == "__main__":
     parser.add_argument("-m", "--metadata", help="Fetch metadata", action="store_true")
     parser.add_argument(
         "-a", "--availability", help="Fetch availability", action="store_true"
+    )
+    parser.add_argument(
+        "-c", "--connections", help="Number of connections", type=int, default=20
     )
 
     # Get args from command line
